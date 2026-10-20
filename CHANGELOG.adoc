@@ -1,5 +1,12 @@
 = Changelog
 
+== [0.2.10] - 2026-10-20
+
+=== Changed
+
+* The Windows search window asks "Search for local Antora docs?" and explains that the build looks for local clones, then caches downloads when none are found. The How section is gone. The scripting bypass and Yes/No buttons stay.
+* Playbook source URLs stay in one list (remote URL and status). Status moves from waiting to searching, then found, not found, or validated from the real cache check and resolver report. The activity log stays under that list. The last line is green "Finished." or red "Finished with errors."
+
 == [0.2.9] - 2026-10-20
 
 === Changed

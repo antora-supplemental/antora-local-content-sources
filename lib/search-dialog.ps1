@@ -29,70 +29,128 @@ try {
     $script:offset = 0
     $script:finished = $false
     $script:started = Get-Date
+    $script:progressing = $false
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = [string]$req.title
     $form.StartPosition = 'CenterScreen'
-    $form.Size = New-Object System.Drawing.Size(720, 640)
-    $form.MinimumSize = New-Object System.Drawing.Size(560, 420)
+    $form.Size = New-Object System.Drawing.Size(960, 760)
+    $form.MinimumSize = New-Object System.Drawing.Size(800, 640)
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 10)
     $form.BackColor = [System.Drawing.Color]::White
 
-    $confirmPanel = New-Object System.Windows.Forms.Panel
-    $confirmPanel.Dock = 'Fill'
-    $confirmPanel.AutoScroll = $true
+    $header = New-Object System.Windows.Forms.Panel
+    $header.Dock = 'Top'
+    $header.AutoScroll = $false
 
     $script:y = 16
-    function Add-Block ([string] $Heading, [string] $Body, [bool] $Muted) {
-        $h = New-Object System.Windows.Forms.Label
-        $h.Text = $Heading
-        $h.AutoSize = $true
-        $h.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-        if ($Muted) {
-            $h.ForeColor = [System.Drawing.Color]::FromArgb(90, 98, 110)
-        } else {
-            $h.ForeColor = [System.Drawing.Color]::FromArgb(20, 78, 122)
-        }
-        $h.Location = New-Object System.Drawing.Point(16, $script:y)
-        $confirmPanel.Controls.Add($h)
-        $script:y += 22
-
-        $b = New-Object System.Windows.Forms.Label
-        $b.Text = $Body
-        $b.AutoSize = $true
-        $b.MaximumSize = New-Object System.Drawing.Size(640, 0)
-        $b.Location = New-Object System.Drawing.Point(16, $script:y)
-        if ($Muted) { $b.ForeColor = [System.Drawing.Color]::FromArgb(70, 78, 90) }
-        $confirmPanel.Controls.Add($b)
-        $height = $b.PreferredHeight
-        if ($height -lt 16) { $height = 32 }
-        $script:y += ($height + 16)
+    function Add-WrapLabel ([string] $Text, [System.Drawing.Font] $Font, [System.Drawing.Color] $Color) {
+        $label = New-Object System.Windows.Forms.Label
+        $label.Text = $Text
+        $label.AutoSize = $true
+        $label.MaximumSize = New-Object System.Drawing.Size(900, 0)
+        $label.Font = $Font
+        $label.ForeColor = $Color
+        $label.Location = New-Object System.Drawing.Point(16, $script:y)
+        $header.Controls.Add($label)
+        $script:y += ($label.PreferredHeight + 12)
+        return $label
     }
 
-    $title = New-Object System.Windows.Forms.Label
-    $title.Text = [string]$req.heading
-    $title.AutoSize = $true
-    $title.MaximumSize = New-Object System.Drawing.Size(640, 0)
-    $title.Font = New-Object System.Drawing.Font('Segoe UI', 14, [System.Drawing.FontStyle]::Bold)
-    $title.Location = New-Object System.Drawing.Point(16, $script:y)
-    $confirmPanel.Controls.Add($title)
-    $script:y += ($title.PreferredHeight + 18)
+    $ink = [System.Drawing.Color]::FromArgb(24, 28, 34)
+    $muted = [System.Drawing.Color]::FromArgb(70, 78, 90)
+    $accent = [System.Drawing.Color]::FromArgb(20, 78, 122)
+    Add-WrapLabel ([string]$req.heading) (New-Object System.Drawing.Font('Segoe UI', 14, [System.Drawing.FontStyle]::Bold)) $ink | Out-Null
+    Add-WrapLabel ([string]$req.lead) (New-Object System.Drawing.Font('Segoe UI', 10)) $ink | Out-Null
+    Add-WrapLabel ([string]$req.detail) (New-Object System.Drawing.Font('Segoe UI', 10)) $ink | Out-Null
+    Add-WrapLabel 'Scripting bypass' (New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)) $accent | Out-Null
+    Add-WrapLabel ([string]$req.bypass) (New-Object System.Drawing.Font('Segoe UI', 9)) $muted | Out-Null
+    $header.Height = $script:y + 4
 
-    Add-Block 'Why' ([string]$req.why) $false
-    Add-Block 'What' ([string]$req.what) $false
-    Add-Block 'How' ([string]$req.how) $false
-    Add-Block 'Scripting bypass' ([string]$req.bypass) $true
+    $list = New-Object System.Windows.Forms.ListView
+    $list.Name = 'sources'
+    $list.View = [System.Windows.Forms.View]::Details
+    $list.FullRowSelect = $true
+    $list.GridLines = $true
+    $list.HideSelection = $false
+    $list.MultiSelect = $false
+    $list.Dock = 'Fill'
+    $list.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+    $list.HeaderStyle = 'Nonclickable'
+    [void]$list.Columns.Add('Remote URL', 640)
+    [void]$list.Columns.Add('Status', 160)
+
+    if ($null -ne $req.sources) {
+        foreach ($src in @($req.sources)) {
+            $item = New-Object System.Windows.Forms.ListViewItem([string]$src.url)
+            $item.Tag = [string]$src.key
+            $initial = [string]$src.status
+            if (-not $initial) { $initial = 'waiting' }
+            [void]$item.SubItems.Add($initial)
+            [void]$list.Items.Add($item)
+        }
+    }
+
+    function Resize-SourceColumns {
+        if ($list.Columns.Count -lt 2) { return }
+        $statusWidth = 160
+        $urlWidth = $list.ClientSize.Width - $statusWidth - 8
+        if ($urlWidth -lt 280) { $urlWidth = 280 }
+        $list.Columns[0].Width = $urlWidth
+        $list.Columns[1].Width = $statusWidth
+    }
+    $list.Add_Resize({ Resize-SourceColumns })
+
+    function Set-SourceStatus ([string] $Url, [string] $Status) {
+        foreach ($item in $list.Items) {
+            $display = [string]$item.Text
+            $key = [string]$item.Tag
+            if ($display -eq $Url -or ($key -and $key -eq $Url)) {
+                if ($item.SubItems.Count -lt 2) {
+                    [void]$item.SubItems.Add($Status)
+                } else {
+                    $item.SubItems[1].Text = $Status
+                }
+            }
+        }
+    }
+
+    $workLabel = New-Object System.Windows.Forms.Label
+    $workLabel.Text = ''
+    $workLabel.Dock = 'Bottom'
+    $workLabel.Height = 28
+    $workLabel.Padding = New-Object System.Windows.Forms.Padding(16, 6, 16, 0)
+    $workLabel.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
+
+    $logBox = New-Object System.Windows.Forms.RichTextBox
+    $logBox.ReadOnly = $true
+    $logBox.DetectUrls = $false
+    $logBox.ScrollBars = 'Vertical'
+    $logBox.Dock = 'Bottom'
+    $logBox.Height = 170
+    $logBox.Font = New-Object System.Drawing.Font('Consolas', 10)
+    $logBox.BackColor = [System.Drawing.Color]::FromArgb(248, 249, 252)
+    $logBox.WordWrap = $true
+    $logBox.BorderStyle = 'FixedSingle'
+
+    function Add-LogLine ([string] $Line, $Color) {
+        $logBox.SelectionStart = $logBox.TextLength
+        $logBox.SelectionLength = 0
+        if ($null -eq $Color) {
+            $logBox.SelectionColor = $logBox.ForeColor
+        } else {
+            $logBox.SelectionColor = $Color
+        }
+        $logBox.AppendText($Line + "`r`n")
+        $logBox.SelectionStart = $logBox.TextLength
+        $logBox.SelectionLength = 0
+        $logBox.SelectionColor = $logBox.ForeColor
+        $logBox.ScrollToCaret()
+    }
 
     $buttonPanel = New-Object System.Windows.Forms.Panel
     $buttonPanel.Dock = 'Bottom'
-    $buttonPanel.Height = 72
-
-    $question = New-Object System.Windows.Forms.Label
-    $question.Text = [string]$req.question
-    $question.AutoSize = $true
-    $question.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
-    $question.Location = New-Object System.Drawing.Point(16, 24)
-    $buttonPanel.Controls.Add($question)
+    $buttonPanel.Height = 56
 
     $yesBtn = New-Object System.Windows.Forms.Button
     $yesBtn.Text = 'Yes'
@@ -105,36 +163,16 @@ try {
     $buttonPanel.Add_Resize({
         $noBtn.Left = $buttonPanel.ClientSize.Width - $noBtn.Width - 16
         $yesBtn.Left = $noBtn.Left - $yesBtn.Width - 12
-        $yesBtn.Top = 18
-        $noBtn.Top = 18
+        $yesBtn.Top = 12
+        $noBtn.Top = 12
     })
 
-    $progressPanel = New-Object System.Windows.Forms.Panel
-    $progressPanel.Dock = 'Fill'
-    $progressPanel.Visible = $false
-
-    $status = New-Object System.Windows.Forms.Label
-    $status.Text = 'Working'
-    $status.Dock = 'Top'
-    $status.Height = 36
-    $status.Padding = New-Object System.Windows.Forms.Padding(16, 10, 16, 0)
-    $status.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
-    $progressPanel.Controls.Add($status)
-
-    $logBox = New-Object System.Windows.Forms.TextBox
-    $logBox.Multiline = $true
-    $logBox.ReadOnly = $true
-    $logBox.ScrollBars = 'Vertical'
-    $logBox.Dock = 'Fill'
-    $logBox.Font = New-Object System.Drawing.Font('Consolas', 10)
-    $logBox.BackColor = [System.Drawing.Color]::FromArgb(248, 249, 252)
-    $logBox.WordWrap = $true
-    $progressPanel.Controls.Add($logBox)
-    $logBox.BringToFront()
-
+    # Last added docks first: buttons, then log, then the working label, then the header.
+    $form.Controls.Add($list)
+    $form.Controls.Add($header)
+    $form.Controls.Add($workLabel)
+    $form.Controls.Add($logBox)
     $form.Controls.Add($buttonPanel)
-    $form.Controls.Add($confirmPanel)
-    $form.Controls.Add($progressPanel)
 
     $form.AcceptButton = $yesBtn
     $form.CancelButton = $noBtn
@@ -150,15 +188,17 @@ try {
     }
 
     function Show-ProgressView {
-        $confirmPanel.Visible = $false
+        if ($script:progressing) { return }
+        $script:progressing = $true
         $buttonPanel.Visible = $false
-        $progressPanel.Visible = $true
+        $buttonPanel.Height = 0
         $form.Text = 'Antora Local content search'
         $form.AcceptButton = $null
         $form.CancelButton = $null
         $form.TopMost = $false
         $script:started = Get-Date
         $script:timer.Start()
+        Resize-SourceColumns
     }
 
     $yesBtn.Add_Click({
@@ -176,6 +216,7 @@ try {
     })
     $form.Add_Shown({
         $form.Activate()
+        Resize-SourceColumns
     })
 
     function Read-SharedText ([string] $Path) {
@@ -201,14 +242,17 @@ try {
         }
     }
 
+    $colorOk = [System.Drawing.Color]::FromArgb(0, 128, 0)
+    $colorBad = [System.Drawing.Color]::FromArgb(178, 24, 24)
+
     $script:timer = New-Object System.Windows.Forms.Timer
     $script:timer.Interval = 200
     $script:timer.Add_Tick({
         if ($script:finished) {
-            $status.Text = 'Finished. You can close this window. The build does not wait on it.'
+            $workLabel.Text = 'Finished. You can close this window. The build does not wait on it.'
         } else {
             $elapsed = (Get-Date) - $script:started
-            $status.Text = ('Working  {0:mm\:ss}' -f $elapsed)
+            $workLabel.Text = ('Working  {0:mm\:ss}' -f $elapsed)
         }
         try {
             $chunk = Read-SharedText $Progress
@@ -231,21 +275,30 @@ try {
             try { $ev = $trim | ConvertFrom-Json } catch { continue }
             $stamp = Get-Date -Format 'HH:mm:ss'
             $kind = [string]$ev.type
-            if ($kind -eq 'done') { $script:finished = $true }
-            $logBox.AppendText(('{0}  {1}  {2}' -f $stamp, $kind, [string]$ev.text) + "`r`n")
+            if ($kind -eq 'source') {
+                Set-SourceStatus ([string]$ev.url) ([string]$ev.status)
+                Add-LogLine ('{0}  {1}  {2}  {3}' -f $stamp, $kind, [string]$ev.url, [string]$ev.status) $null
+                continue
+            }
+            if ($kind -eq 'done') {
+                $script:finished = $true
+                $ok = $true
+                if ($null -ne $ev.ok) { $ok = [bool]$ev.ok }
+                $msg = [string]$ev.text
+                if (-not $msg) {
+                    if ($ok) { $msg = 'Finished.' } else { $msg = 'Finished with errors.' }
+                }
+                $paint = $colorOk
+                if (-not $ok) { $paint = $colorBad }
+                Add-LogLine $msg $paint
+                continue
+            }
+            Add-LogLine ('{0}  {1}  {2}' -f $stamp, $kind, [string]$ev.text) $null
         }
     })
 
     if ($Mode -eq 'progress') {
-        $confirmPanel.Visible = $false
-        $buttonPanel.Visible = $false
-        $progressPanel.Visible = $true
-        $form.Text = 'Antora Local content search'
-        $form.AcceptButton = $null
-        $form.CancelButton = $null
-        $form.TopMost = $false
-        $script:started = Get-Date
-        $script:timer.Start()
+        Show-ProgressView
     }
 
     Write-TextFile $Ready 'ready'

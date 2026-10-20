@@ -11,6 +11,7 @@ const {
   buildConfirmModel,
   renderConfirmHtml,
   resolveSearchChannel,
+  statusForReportRow,
 } = require('../lib/search-ui')
 
 const desktopEnv = { USERPROFILE: 'C:\\Users\\me', SESSIONNAME: 'Console' }
@@ -78,20 +79,38 @@ test('resolveSearchChannel uses the dialog on a Windows desktop', () => {
   }), 'tty-progress')
 })
 
-test('confirm html snapshot has sections and Yes/No', () => {
-  const html = renderConfirmHtml(buildConfirmModel({
-    missingCount: 5,
-    total: 5,
+test('confirm html snapshot has the new copy, source list, and Yes/No', () => {
+  const model = buildConfirmModel({
+    missingCount: 1,
+    total: 2,
     platform: 'win32',
-    payload: { searchMethod: 'auto', searchOtherDrives: true },
-  }))
-  assert.match(html, /<h2>Why<\/h2>/)
-  assert.match(html, /<h2>What<\/h2>/)
-  assert.match(html, /<h2>How<\/h2>/)
+    payload: {
+      searchMethod: 'auto',
+      sources: [
+        { url: 'https://example.com/docs.git' },
+        { url: 'https://example.com/already.git' },
+      ],
+    },
+  })
+  assert.equal(model.title, 'Antora Local content search')
+  assert.equal(model.heading, 'Search for local Antora docs?')
+  assert.equal(model.lead, 'Your Antora project sources its docs from online repositories. This build process will find local copies on your machine to use. If none are found, the build will download copies into a cache for fast rebuilds.')
+  assert.equal(model.detail, 'This build process will search for .antora-source-id marker files to identify local clones of docs sources.')
+  assert.equal(model.how, undefined)
+  assert.equal(model.sources.length, 2)
+  assert.equal(model.sources[0].status, 'waiting')
+  assert.equal(model.sources[1].status, 'waiting')
+  const html = renderConfirmHtml(model)
+  assert.match(html, /<h1>Search for local Antora docs\?<\/h1>/)
+  assert.match(html, /online repositories/)
+  assert.match(html, /\.antora-source-id/)
   assert.match(html, /<h2>Scripting bypass<\/h2>/)
-  assert.match(html, /5 of 5 remote source\(s\)/)
-  assert.match(html, /NTFS MFT/)
-  assert.match(html, /Proceed with search\?/)
+  assert.match(html, /<th>Remote URL<\/th><th>Status<\/th>/)
+  assert.match(html, /https:\/\/example.com\/docs.git/)
+  assert.match(html, /<td>waiting<\/td>/)
+  assert.doesNotMatch(html, /<h2>How<\/h2>/)
+  assert.doesNotMatch(html, /<h2>Why<\/h2>/)
+  assert.doesNotMatch(html, /<h2>What<\/h2>/)
   assert.match(html, /<button type="button">Yes<\/button>/)
   assert.match(html, /<button type="button">No<\/button>/)
   assert.match(html, /ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes/)
@@ -99,10 +118,20 @@ test('confirm html snapshot has sections and Yes/No', () => {
   assert.match(html, /ANTORA_LOCAL_SOURCES_UI=tty/)
   assert.doesNotMatch(html, /[\u2014\u2026]/)
   const ps1 = fs.readFileSync(path.join(__dirname, '../lib/search-dialog.ps1'), 'utf8')
-  for (const label of ['Why', 'What', 'How', 'Scripting bypass', "Text = 'Yes'", "Text = 'No'"]) {
+  for (const label of ['Scripting bypass', "Text = 'Yes'", "Text = 'No'", 'ListView', 'Details', 'RichTextBox', 'SelectionColor', 'Finished.', 'Finished with errors.', 'Antora Local content search']) {
     assert.equal(ps1.includes(label), true, label)
   }
+  assert.equal(ps1.includes("Add-Block 'How'"), false)
   assert.equal([...ps1].every((ch) => ch.codePointAt(0) < 128), true)
+})
+
+test('report rows map to validated, found, or not found', () => {
+  assert.equal(statusForReportRow({ localRoot: null, method: 'none' }), 'not found')
+  assert.equal(statusForReportRow({ method: 'marker-search' }), 'not found')
+  assert.equal(statusForReportRow({ localRoot: 'C:\\clone', method: 'cache' }), 'validated')
+  assert.equal(statusForReportRow({ localRoot: 'C:\\clone', method: 'marker-search' }), 'found')
+  assert.equal(statusForReportRow({ localRoot: 'C:\\clone', method: 'hive-heuristic' }), 'found')
+  assert.equal(statusForReportRow({ localRoot: 'C:\\clone', method: 'first-match' }), 'found')
 })
 
 test('desktop confirm uses the dialog and does not print the banner', () => {
@@ -131,7 +160,8 @@ test('desktop confirm uses the dialog and does not print the banner', () => {
     assert.equal(result.proceed, true)
     assert.equal(result.sink.mode, 'gui')
     assert.equal(launched.mode, 'confirm')
-    assert.match(launched.model.why, /2 of 4 remote source\(s\)/)
+    assert.equal(launched.model.heading, 'Search for local Antora docs?')
+    assert.equal(launched.model.how, undefined)
     assert.equal(cap.chunks.length, 0)
     assert.equal(cap.warns.length, 0)
   } finally {

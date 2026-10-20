@@ -7,7 +7,7 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 
 const { formatMarkerFile, markerIdForRemote, MARKER_BASENAME } = require('../lib/marker-id')
-const { parseConfirmToken, diskSearchNeeded, confirmSearchPreflight, formatConfirmQuestion } = require('../lib/confirm-search')
+const { parseConfirmToken, diskSearchNeeded, confirmSearchPreflight, formatConfirmQuestion, runningInCi } = require('../lib/confirm-search')
 
 test('confirm prompt keeps a space in remote source(s)', () => {
   const question = formatConfirmQuestion(5, 5)
@@ -58,15 +58,45 @@ test('non-TTY on a Windows desktop still prompts so a dialog can show', () => {
 
 test('non-TTY without a desktop still searches without a prompt', () => {
   assert.equal(confirmSearchPreflight({}, {
-    env: { CI: 'true', USERPROFILE: 'C:\\Users\\me', SESSIONNAME: 'Console' },
-    stdinIsTTY: false,
-    platform: 'win32',
-  }), 'yes')
-  assert.equal(confirmSearchPreflight({}, {
     env: { USERPROFILE: 'C:\\Users\\me', ANTORA_LOCAL_SOURCES_UI: 'tty' },
     stdinIsTTY: false,
     platform: 'win32',
   }), 'yes')
+})
+
+test('CI skips disk search even when confirm is yes', () => {
+  for (const env of [
+    { CI: 'true' },
+    { CI: '1' },
+    { GITHUB_ACTIONS: 'true' },
+    { TF_BUILD: 'True' },
+    { GITLAB_CI: 'true' },
+    { CIRCLECI: 'true' },
+    { BUILDKITE: 'true' },
+    { JENKINS_URL: 'http://jenkins.example' },
+  ]) {
+    assert.equal(runningInCi(env), true, JSON.stringify(env))
+    assert.equal(confirmSearchPreflight({}, {
+      env: {
+        ...env,
+        USERPROFILE: 'C:\\Users\\me',
+        SESSIONNAME: 'Console',
+        ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH: 'yes',
+      },
+      stdinIsTTY: true,
+      platform: 'win32',
+    }), 'no', JSON.stringify(env))
+  }
+  assert.equal(runningInCi({}), false)
+  assert.equal(confirmSearchPreflight({}, {
+    env: {
+      USERPROFILE: 'C:\\Users\\me',
+      SESSIONNAME: 'Console',
+      ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH: 'no',
+    },
+    stdinIsTTY: true,
+    platform: 'win32',
+  }), 'no')
 })
 
 test('confirm env bypass wins over a desktop session', () => {

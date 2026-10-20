@@ -38,7 +38,7 @@ node -e "const m=require('@antora-supplemental/antora-local-content-sources/lib/
 
 == Playbook wiring
 
-**Hubs on `@antora-supplemental/facto-stack`:** the compose pack registers this extension automatically (`mode: auto`, disabled in CI). Override on the pack require: `localContentSources: { confirmSearch: never-prompt }` or `localContentSources: false` to disable.
+**Hubs on `@antora-supplemental/facto-stack`:** the compose pack registers this extension automatically (`mode: auto`). CI does not scan the disk; a cache hit can still rewrite a source, and a miss stays a remote URL. Override on the pack require: `localContentSources: { confirmSearch: never-prompt }` or `localContentSources: false` to disable.
 
 **Standalone** (non-pack playbooks):
 
@@ -56,17 +56,17 @@ antora:
 
 When cached clone paths are missing or invalid, the extension may scan drives (slow on Windows MFT).
 
-On a **Windows desktop session** it opens a window with Why / What / How / scripting bypass and Yes / No. After Yes, that same window shows a scrollable progress log (download, search, elapsed time, conflicts). The ASCII banner and Y/n prompt are not printed. Closing the progress window does not stop the build.
+On a **Windows desktop session** it opens a window titled "Antora Local content search" with the question "Search for local Antora docs?", the playbook source list, and Yes / No. After Yes, that same window keeps the list and a scrollable activity log. The ASCII banner and Y/n prompt are not printed. Closing the progress window does not stop the build.
 
 Shell output is used only when there is no desktop UI, or when you force it:
 
-* `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes` -- search without prompting (agent bypass; phase lines on the terminal, ASCII, once)
+* `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes` -- outside CI, search without prompting (agent bypass; phase lines on the terminal, ASCII, once). In CI this does not start a disk scan.
 * `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=no` -- skip search; use remotes for uncached sources (still applies valid cache entries)
-* `ANTORA_LOCAL_SOURCES_UI=tty` -- force the terminal banner and Y/n prompt (`shell` and `ascii` are aliases)
+* `ANTORA_LOCAL_SOURCES_UI=tty` -- force the terminal banner and Y/n prompt (`shell` and `ascii` are aliases). CI still does not scan.
 
 If the window cannot be created, the extension says so once and falls back to the terminal banner.
 
-Non-TTY runs with no desktop (CI, SSH, service session) still default to **yes** (search, no prompt). A desktop session can show the window even when stdin is not a TTY.
+CI (`CI`, `GITHUB_ACTIONS`, `TF_BUILD`, `GITLAB_CI`, plus CircleCI, Buildkite, and Jenkins) never opens the dialog and never walks the disk. A cache hit may still point a source at a recorded local path. SSH and other headless sessions that are not CI still default to **yes** (search, no prompt). A desktop session can show the window even when stdin is not a TTY.
 
 Discovery finds every `.antora-source-id` candidate (MFT on Windows, walks elsewhere), then **reads the file** and matches `id` / `url`.
 

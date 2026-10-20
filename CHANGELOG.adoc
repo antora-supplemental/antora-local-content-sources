@@ -1,5 +1,11 @@
 = Changelog
 
+== [0.2.11] - 2026-10-20
+
+=== Changed
+
+* CI never scans the local disk for clones and never opens the search window. `CI`, `GITHUB_ACTIONS`, `TF_BUILD`, `GITLAB_CI`, CircleCI, Buildkite, and Jenkins leave playbook URLs remote unless a cache entry still points at a real local path. `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes` does not override that. Outside CI, `yes` may still scan and `no` stays cache-only.
+
 == [0.2.10] - 2026-10-20
 
 === Changed

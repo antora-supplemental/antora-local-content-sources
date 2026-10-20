@@ -44,12 +44,12 @@ test('resolveSearchChannel keeps agents and CI on the shell', () => {
     platform: 'win32',
   }), 'tty-progress')
 
-  const ci = { ...desktopEnv, CI: 'true' }
+  const ci = { ...desktopEnv, CI: 'true', ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH: 'yes' }
   assert.equal(resolveSearchChannel({
     preflight: confirmSearchPreflight({}, { env: ci, stdinIsTTY: false, platform: 'win32' }),
     env: ci,
     platform: 'win32',
-  }), 'tty-progress')
+  }), 'skip')
 
   const forced = { ...desktopEnv, ANTORA_LOCAL_SOURCES_UI: 'tty' }
   assert.equal(resolveSearchChannel({
@@ -64,6 +64,37 @@ test('resolveSearchChannel keeps agents and CI on the shell', () => {
     env: skip,
     platform: 'win32',
   }), 'skip')
+})
+
+test('CI does not open the dialog and does not search', () => {
+  const cap = capture()
+  const restore = cap.install()
+  let launched = false
+  try {
+    const result = askToSearch({
+      logger: cap.logger,
+      missingCount: 2,
+      total: 2,
+      payload: { searchMethod: 'auto', sources: [{ url: 'https://example.com/docs.git' }] },
+      env: { ...desktopEnv, CI: 'true', ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH: 'yes' },
+      platform: 'win32',
+      stdinIsTTY: true,
+      launch: () => {
+        launched = true
+        throw new Error('dialog must not open in CI')
+      },
+      readAnswer: () => {
+        throw new Error('must not prompt in CI')
+      },
+    })
+    assert.equal(launched, false)
+    assert.equal(result.proceed, false)
+    assert.equal(result.sink, null)
+    assert.equal(cap.chunks.length, 0)
+    assert.match(cap.warns.join('\n'), /disk search skipped/)
+  } finally {
+    restore()
+  }
 })
 
 test('resolveSearchChannel uses the dialog on a Windows desktop', () => {

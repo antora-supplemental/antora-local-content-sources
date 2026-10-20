@@ -8,7 +8,12 @@ const path = require('node:path')
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 
-const { markerBasenameForRemote, normalizeGitRemoteUrl } = require('../lib/marker-id')
+const {
+  markerIdForRemote,
+  normalizeGitRemoteUrl,
+  formatMarkerFile,
+  MARKER_BASENAME,
+} = require('../lib/marker-id')
 const { resolveLocalSources, resolveLocalSourcesAsync } = require('../lib/resolve')
 const { pickOverridePath, loadPathOverrides } = require('../lib/overrides')
 const { searchUpwardFrom } = require('../lib/search')
@@ -19,11 +24,11 @@ test('normalizeGitRemoteUrl collapses https and .git', () => {
   assert.equal(a, b)
 })
 
-test('marker basename is stable', () => {
-  const m1 = markerBasenameForRemote('https://github.com/dev-centr/docs.git')
-  const m2 = markerBasenameForRemote('https://github.com/dev-centr/docs')
+test('marker id is stable 32 hex', () => {
+  const m1 = markerIdForRemote('https://github.com/dev-centr/docs.git')
+  const m2 = markerIdForRemote('https://github.com/dev-centr/docs')
   assert.equal(m1, m2)
-  assert.match(m1, /^\.antora-src-[0-9a-f]{32}$/)
+  assert.match(m1, /^[0-9a-f]{32}$/)
 })
 
 test('resolve finds marker file under search root', () => {
@@ -32,8 +37,7 @@ test('resolve finds marker file under search root', () => {
   fs.mkdirSync(repo, { recursive: true })
   fs.mkdirSync(path.join(repo, '.git'))
   const remote = 'https://github.com/dev-centr/docs.git'
-  const marker = markerBasenameForRemote(remote)
-  fs.writeFileSync(path.join(repo, marker), remote + '\n')
+  fs.writeFileSync(path.join(repo, MARKER_BASENAME), formatMarkerFile(remote))
   const cachePath = path.join(tmp, 'cache.json')
   const { resolved, report } = resolveLocalSources({
     sources: [{ url: remote, branches: 'HEAD', start_path: 'docs' }],
@@ -46,6 +50,7 @@ test('resolve finds marker file under search root', () => {
   assert.equal(resolved[0].url, repo)
   assert.equal(resolved[0].worktrees, true)
   assert.equal(report[0].method, 'marker-search')
+  assert.equal(report[0].markerId, markerIdForRemote(remote))
 })
 
 test('upward search finds clone in parent directory', () => {
@@ -54,32 +59,31 @@ test('upward search finds clone in parent directory', () => {
   fs.mkdirSync(repo, { recursive: true })
   fs.mkdirSync(path.join(repo, '.git'))
   const remote = 'https://github.com/dev-centr/docs.git'
-  const marker = markerBasenameForRemote(remote)
-  fs.writeFileSync(path.join(repo, marker), remote + '\n')
+  fs.writeFileSync(path.join(repo, MARKER_BASENAME), formatMarkerFile(remote))
   const nested = path.join(tmp, 'playbook', 'hub')
   fs.mkdirSync(nested, { recursive: true })
-  const hits = searchUpwardFrom(nested, marker, 5, 4)
-  assert.ok(hits.some((h) => path.resolve(h) === path.resolve(repo)))
+  const hits = searchUpwardFrom(nested, MARKER_BASENAME, 5, 4)
+  assert.ok(hits.some((h) => path.resolve(h) === path.resolve(path.join(repo, MARKER_BASENAME))))
 })
 
 test('duplicate clones report conflict and override selects path', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'antora-lcs-dup-'))
   const remote = 'https://github.com/dev-centr/docs.git'
-  const marker = markerBasenameForRemote(remote)
   const repoA = path.join(tmp, 'a', 'docs')
   const repoB = path.join(tmp, 'b', 'docs')
   for (const repo of [repoA, repoB]) {
     fs.mkdirSync(repo, { recursive: true })
     fs.mkdirSync(path.join(repo, '.git'))
-    fs.writeFileSync(path.join(repo, marker), remote + '\n')
+    fs.writeFileSync(path.join(repo, MARKER_BASENAME), formatMarkerFile(remote))
   }
+  const markerId = markerIdForRemote(remote)
   const overridesFile = path.join(tmp, '.antora-local-sources.yml')
   fs.writeFileSync(
     overridesFile,
-    `sources:\n  ${normalizeGitRemoteUrl(remote)}:\n    path: ${JSON.stringify(repoB)}\n`
+    `sources:\n  ${markerId}:\n    path: ${JSON.stringify(repoB)}\n`
   )
   const overrides = loadPathOverrides([overridesFile])
-  assert.equal(pickOverridePath(overrides, normalizeGitRemoteUrl(remote), marker), path.resolve(repoB))
+  assert.equal(pickOverridePath(overrides, normalizeGitRemoteUrl(remote), markerId), path.resolve(repoB))
 
   const { report } = await resolveLocalSourcesAsync({
     sources: [{ url: remote }],
@@ -98,13 +102,12 @@ test('duplicate clones report conflict and override selects path', async () => {
 test('duplicate clones without override set conflict flag', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'antora-lcs-dup2-'))
   const remote = 'https://github.com/dev-centr/docs.git'
-  const marker = markerBasenameForRemote(remote)
   const repoA = path.join(tmp, 'a', 'docs')
   const repoB = path.join(tmp, 'b', 'docs')
   for (const repo of [repoA, repoB]) {
     fs.mkdirSync(repo, { recursive: true })
     fs.mkdirSync(path.join(repo, '.git'))
-    fs.writeFileSync(path.join(repo, marker), remote + '\n')
+    fs.writeFileSync(path.join(repo, MARKER_BASENAME), formatMarkerFile(remote))
   }
   const { report } = await resolveLocalSourcesAsync({
     sources: [{ url: remote }],

@@ -1,5 +1,6 @@
-# Copy to .antora-local-sources.yml (gitignored) when multiple clones share the same marker.
-# Keys: normalized HTTPS git URL and/or `.antora-src-*` marker basename.
+# Copy to .antora-local-sources.yml (gitignored) when multiple clones share the same marker id.
 sources:
   https://github.com/dev-centr/docs:
+    path: C:/code/github.com/dev-centr/docs
+  e3cf0439ac8b22aea9c985f358734acf:
     path: C:/code/github.com/dev-centr/docs

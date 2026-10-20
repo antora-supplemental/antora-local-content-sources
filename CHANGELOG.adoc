@@ -1,5 +1,13 @@
 = Changelog
 
+== [0.2.2] - 2026-10-20
+
+=== Changed
+
+* **Canonical marker:** fixed filename `.antora-source-id` with stable `id:` + `url:` lines in the body (id is not encoded in the path). MFT / walks search that basename only, then read files to match.
+* Hash filenames `.antora-src-*` are deprecated but still honored when present.
+* Cache / report use `markerId` (32 hex); cache format version 2.
+
 == [0.2.1] - 2026-10-20
 
 === Changed

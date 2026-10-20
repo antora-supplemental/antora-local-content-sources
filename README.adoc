@@ -6,22 +6,34 @@ Antora extension that rewrites *remote* `content.sources` URLs to local git chec
 
 Committed `antora-playbook-local.yml` files assume a fixed sibling folder layout (`../devcentr`, …). That breaks when clones live under `%code%/github.com/...` or other hive layouts. This extension keeps **one** committed playbook (`antora-playbook.yml` with GitHub URLs) and resolves locals at build time.
 
-== Marker files (per content repo)
+== Marker file (per content repo)
 
-Each git remote gets a stable marker **basename** derived from the normalized URL (SHA-256, same algorithm in Node and the D CLI):
+Each clone gets a **fixed short filename** at the repository root (next to `.git`):
 
 [source]
 ----
-.antora-src-<32 hex chars>
+.antora-source-id
 ----
 
-Place the marker at the **root of the clone** (next to `.git`). File body should be the canonical HTTPS URL (one line). Legacy name `.antora-source-id` with the same URL is also accepted.
+The **stable id is inside the file**, not in the name (avoids long or awkward path segments). Body format:
 
-Generate a marker name for a URL:
+[source]
+----
+antora-supplemental:local-content-sources:v1
+id: e3cf0439ac8b22aea9c985f358734acf
+url: https://github.com/org/repo
+----
+
+* `id` — 32-hex SHA-256 fingerprint of the normalized git remote (deterministic; same in Node and D).
+* `url` — canonical HTTPS remote (one remote per marker, not per Antora `start_path`).
+
+Legacy: a single-line URL-only body still works. Deprecated hash **filenames** `.antora-src-<id>` are still read if present; new repos should use `.antora-source-id` only.
+
+Generate content for a remote:
 
 [source,shell]
 ----
-node -e "console.log(require('@antora-supplemental/antora-local-content-sources/lib/marker-id').markerBasenameForRemote('https://github.com/org/repo.git'))"
+node -e "const m=require('@antora-supplemental/antora-local-content-sources/lib/marker-id');console.log(m.formatMarkerFile('https://github.com/org/repo.git'))"
 ----
 
 == Playbook wiring
@@ -31,54 +43,21 @@ node -e "console.log(require('@antora-supplemental/antora-local-content-sources/
 antora:
   extensions:
     - require: '@antora-supplemental/antora-local-content-sources'
-      mode: auto   # off in CI; on locally unless ANTORA_LOCAL_SOURCES=0
-      # searchRoots: []        # extra roots (e.g. %code%)
-      # maxUpwardHops: 16       # limit ancestor walk from playbook dir
-      # maxDepth: 10            # depth under each search anchor
-      # searchOtherDrives: true # other drive letters / mount points (parallel)
-      # dAutoDownload: true     # fetch D CLI from GitHub Releases when missing
-      # dRelease: v0.1.0
-      # cacheDir: build/.antora
+      mode: auto
 ----
+
+Discovery finds every `.antora-source-id` candidate (MFT on Windows, walks elsewhere), then **reads the file** and matches `id` / `url`.
 
 == Duplicate clones
 
-When more than one checkout contains the same marker, the build **lists every path** (Antora log + D CLI stderr) and uses the first hit in search order. Pin the checkout you want in a **gitignored** file at the playbook root:
-
-[source,yaml]
-----
-# .antora-local-sources.yml (copy from .antora-local-sources.example.yml)
-sources:
-  https://github.com/dev-centr/docs:
-    path: C:/code/github.com/dev-centr/docs
-  .antora-src-e3cf0439ac8b22aea9c985f358734acf:
-    path: C:/code/github.com/dev-centr/docs
-----
-
-== Search order
-
-. Playbook directory (depth `maxDepth`)
-. Each parent directory up to `maxUpwardHops`, searching the parent tree but **not** re-entering the child directory already scanned
-. Extra `searchRoots` (for example `%code%`)
-. **Windows NTFS:** current volume + other drives via **MFT** filename scan in `antora-source-resolver` (no recursive directory walk; one index per drive per build). Requires the D binary (auto-download). Raw volume access may need an elevated shell if `\\.\X:` open fails — upward/extra-root search still runs without admin.
-. **Non-Windows:** parallel directory walk on each drive (`searchMethod: walk` forces walk on Windows too)
-
-Config / env: `searchMethod: auto | mft | walk`, or `ANTORA_LOCAL_SOURCES_SEARCH_METHOD`.
+When more than one checkout matches, the build lists paths and uses the first unless you pin one in gitignored `.antora-local-sources.yml` (see `.antora-local-sources.example.yml`). Override keys: `url`, `id:` hex, or legacy `.antora-src-<id>`.
 
 == Artifacts (gitignored)
 
-* `build/.antora/local-content-cache.json` — cached clone paths
-* `build/.antora/antora-playbook-local.generated.yml` — snapshot after resolution (for debugging)
-* `build/.antora/bin/` — downloaded `antora-source-resolver` binary when auto-download is enabled
+* `build/.antora/local-content-cache.json`
+* `build/.antora/antora-playbook-local.generated.yml`
+* `build/.antora/bin/` — optional D resolver download
 
-== D accelerator
+== D resolver + MFT
 
-https://github.com/antora-supplemental/antora-source-resolver[`antora-source-resolver`] — same contract, faster walks. Released on GitHub (`v0.1.0+`); the extension downloads the matching asset for your OS/arch into `build/.antora/bin/` when `dAutoDownload` is true. Override with `dBinary` or a local `dub build`.
-
-== Modes
-
-* `auto` — enable locally; disabled when `CI` or `GITHUB_ACTIONS` is set
-* `on` / `off` — force
-* Env: `ANTORA_LOCAL_SOURCES=1|0` overrides `auto`
-
-If no local clone is found, the remote URL is kept and a warning is logged.
+On Windows NTFS, https://github.com/antora-supplemental/antora-source-resolver[antora-source-resolver] locates `.antora-source-id` via MFT, then validates file contents.

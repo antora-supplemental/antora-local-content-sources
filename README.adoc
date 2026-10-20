@@ -60,7 +60,10 @@ sources:
 . Playbook directory (depth `maxDepth`)
 . Each parent directory up to `maxUpwardHops`, searching the parent tree but **not** re-entering the child directory already scanned
 . Extra `searchRoots` (for example `%code%`)
-. Other drives / mount points (parallel; skip with `ANTORA_LOCAL_SOURCES_SEARCH_DRIVES=0`)
+. **Windows NTFS:** current volume + other drives via **MFT** filename scan in `antora-source-resolver` (no recursive directory walk; one index per drive per build). Requires the D binary (auto-download). Raw volume access may need an elevated shell if `\\.\X:` open fails — upward/extra-root search still runs without admin.
+. **Non-Windows:** parallel directory walk on each drive (`searchMethod: walk` forces walk on Windows too)
+
+Config / env: `searchMethod: auto | mft | walk`, or `ANTORA_LOCAL_SOURCES_SEARCH_METHOD`.
 
 == Artifacts (gitignored)
 

@@ -1,5 +1,12 @@
 = Changelog
 
+== [0.2.1] - 2026-10-20
+
+=== Changed
+
+* Windows drive-wide search defers to D resolver NTFS **MFT** scan (`searchMethod: auto`); Node skips parallel drive walks on win32.
+* Warn when D resolver is missing on Windows (MFT volume pass skipped).
+
 == [0.2.0] - 2026-10-20
 
 === Added

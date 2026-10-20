@@ -38,6 +38,10 @@ node -e "const m=require('@antora-supplemental/antora-local-content-sources/lib/
 
 == Playbook wiring
 
+**Hubs on `@antora-supplemental/facto-stack`:** the compose pack registers this extension automatically (`mode: auto`, disabled in CI). Override on the pack require: `localContentSources: { confirmSearch: never-prompt }` or `localContentSources: false` to disable.
+
+**Standalone** (non-pack playbooks):
+
 [source,yaml]
 ----
 antora:

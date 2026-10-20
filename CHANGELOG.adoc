@@ -1,5 +1,11 @@
 = Changelog
 
+== [0.2.7] - 2026-10-20
+
+=== Fixed
+
+* Disk-search banner wraps long lines inside the ASCII frame so the right border stays on the same row.
+
 == [0.2.6] - 2026-10-20
 
 === Fixed

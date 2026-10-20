@@ -6,6 +6,7 @@ const assert = require('node:assert/strict')
 const {
   formatBanner,
   announceDiskSearchPlan,
+  announcePhase,
   buildDiskSearchLines,
   BANNER_WIDTH,
 } = require('../lib/progress-log')
@@ -87,6 +88,59 @@ test('formatBanner wraps long lines so the right border stays on the row', () =>
   assert.doesNotMatch(banner, /remotesource/)
   const narrow = formatBanner([long], 24)
   for (const row of narrow.split('\n')) assert.equal(row.length, 24, row)
+})
+
+test('announcePhase logs ASCII once and does not copy the line to stderr', () => {
+  const warns = []
+  const chunks = []
+  const orig = process.stderr.write
+  process.stderr.write = (chunk) => {
+    chunks.push(String(chunk))
+    return true
+  }
+  try {
+    announcePhase(
+      { warn: (...args) => warns.push(args) },
+      'running disk search via Node resolver \u2014 please wait'
+    )
+  } finally {
+    process.stderr.write = orig
+  }
+  assert.equal(warns.length, 1)
+  assert.equal(warns[0][0], '%s')
+  const msg = warns[0][1]
+  assert.match(msg, /\[local-content-sources\] running disk search via Node resolver - please wait/)
+  assert.match(msg, /please wait/)
+  assert.doesNotMatch(msg, /pleasewait/)
+  assert.equal([...msg].every((ch) => ch.codePointAt(0) < 128), true)
+  assert.equal(chunks.length, 0)
+})
+
+test('announcePhase on a gui sink stays off the logger and stderr', () => {
+  const warns = []
+  const phases = []
+  const chunks = []
+  const orig = process.stderr.write
+  process.stderr.write = (chunk) => {
+    chunks.push(String(chunk))
+    return true
+  }
+  try {
+    announcePhase(
+      { warn: () => warns.push('logged') },
+      'D resolver unavailable on Windows - run elevated if volume access fails.',
+      { mode: 'gui', phase: (text) => phases.push(text) }
+    )
+  } finally {
+    process.stderr.write = orig
+  }
+  assert.deepEqual(phases, [
+    '[local-content-sources] D resolver unavailable on Windows - run elevated if volume access fails.',
+  ])
+  assert.match(phases[0], /elevated if/)
+  assert.doesNotMatch(phases[0], /elevatedif/)
+  assert.equal(warns.length, 0)
+  assert.equal(chunks.length, 0)
 })
 
 test('disk-search banner content fits the default frame', () => {

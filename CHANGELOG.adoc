@@ -1,5 +1,13 @@
 = Changelog
 
+== [0.2.8] - 2026-10-20
+
+=== Changed
+
+* On a Windows desktop, disk-search confirmation is a sectioned Yes/No window (Why, What, How, scripting bypass) and later progress stays in that window's scrollable log.
+* The ASCII stderr banner and Y/n prompt are only used for CI, headless sessions, `ANTORA_LOCAL_SOURCES_UI=tty`, the `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH` bypass, or when the window cannot be created (one line says why).
+* Phase lines go to the Antora logger once, as ASCII (`-`, `...`), and are not copied to stderr. Em dashes and ellipses no longer show up as console mojibake.
+
 == [0.2.7] - 2026-10-20
 
 === Fixed

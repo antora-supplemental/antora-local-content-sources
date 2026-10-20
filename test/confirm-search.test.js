@@ -48,6 +48,47 @@ test('diskSearchNeeded false when cache valid', () => {
   assert.equal(r.needed, false)
 })
 
+test('non-TTY on a Windows desktop still prompts so a dialog can show', () => {
+  assert.equal(confirmSearchPreflight({}, {
+    env: { USERPROFILE: 'C:\\Users\\me', SESSIONNAME: 'Console' },
+    stdinIsTTY: false,
+    platform: 'win32',
+  }), 'prompt')
+})
+
+test('non-TTY without a desktop still searches without a prompt', () => {
+  assert.equal(confirmSearchPreflight({}, {
+    env: { CI: 'true', USERPROFILE: 'C:\\Users\\me', SESSIONNAME: 'Console' },
+    stdinIsTTY: false,
+    platform: 'win32',
+  }), 'yes')
+  assert.equal(confirmSearchPreflight({}, {
+    env: { USERPROFILE: 'C:\\Users\\me', ANTORA_LOCAL_SOURCES_UI: 'tty' },
+    stdinIsTTY: false,
+    platform: 'win32',
+  }), 'yes')
+})
+
+test('confirm env bypass wins over a desktop session', () => {
+  assert.equal(confirmSearchPreflight({}, {
+    env: {
+      USERPROFILE: 'C:\\Users\\me',
+      SESSIONNAME: 'Console',
+      ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH: 'yes',
+    },
+    stdinIsTTY: true,
+    platform: 'win32',
+  }), 'yes')
+  assert.equal(confirmSearchPreflight({}, {
+    env: {
+      USERPROFILE: 'C:\\Users\\me',
+      ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH: 'no',
+    },
+    stdinIsTTY: true,
+    platform: 'win32',
+  }), 'no')
+})
+
 test('confirmSearchPreflight respects env bypass', () => {
   const prev = process.env.ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH
   try {

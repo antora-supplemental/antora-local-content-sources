@@ -54,14 +54,19 @@ antora:
 
 == Disk search confirmation
 
-When cached clone paths are missing or invalid, the extension may scan drives (slow on Windows MFT). On an **interactive terminal** it asks before searching.
+When cached clone paths are missing or invalid, the extension may scan drives (slow on Windows MFT).
 
-Scripting bypass (also printed in the prompt for agents):
+On a **Windows desktop session** it opens a window with Why / What / How / scripting bypass and Yes / No. After Yes, that same window shows a scrollable progress log (download, search, elapsed time, conflicts). The ASCII banner and Y/n prompt are not printed. Closing the progress window does not stop the build.
 
-* `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes` — search without prompting
-* `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=no` — skip search; use remotes for uncached sources (still applies valid cache entries)
+Shell output is used only when there is no desktop UI, or when you force it:
 
-Non-TTY runs default to **yes** (search) unless the env var is set.
+* `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes` -- search without prompting (agent bypass; phase lines on the terminal, ASCII, once)
+* `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=no` -- skip search; use remotes for uncached sources (still applies valid cache entries)
+* `ANTORA_LOCAL_SOURCES_UI=tty` -- force the terminal banner and Y/n prompt (`shell` and `ascii` are aliases)
+
+If the window cannot be created, the extension says so once and falls back to the terminal banner.
+
+Non-TTY runs with no desktop (CI, SSH, service session) still default to **yes** (search, no prompt). A desktop session can show the window even when stdin is not a TTY.
 
 Discovery finds every `.antora-source-id` candidate (MFT on Windows, walks elsewhere), then **reads the file** and matches `id` / `url`.
 

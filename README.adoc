@@ -1,0 +1,55 @@
+= antora-local-content-sources
+
+Antora extension that rewrites *remote* `content.sources` URLs to local git checkouts before the site generator fetches content.
+
+== Why
+
+Committed `antora-playbook-local.yml` files assume a fixed sibling folder layout (`../devcentr`, …). That breaks when clones live under `%code%/github.com/...` or other hive layouts. This extension keeps **one** committed playbook (`antora-playbook.yml` with GitHub URLs) and resolves locals at build time.
+
+== Marker files (per content repo)
+
+Each git remote gets a stable marker **basename** derived from the normalized URL (SHA-256, same algorithm in Node and the optional D CLI):
+
+[source]
+----
+.antora-src-<32 hex chars>
+----
+
+Place the marker at the **root of the clone** (next to `.git`). File body should be the canonical HTTPS URL (one line). Legacy name `.antora-source-id` with the same URL is also accepted.
+
+Generate a marker name for a URL:
+
+[source,shell]
+----
+node -e "console.log(require('@antora-supplemental/antora-local-content-sources/lib/marker-id').markerBasenameForRemote('https://github.com/org/repo.git'))"
+----
+
+== Playbook wiring
+
+[source,yaml]
+----
+antora:
+  extensions:
+    - require: '@antora-supplemental/antora-local-content-sources'
+      mode: auto   # off in CI; on locally unless ANTORA_LOCAL_SOURCES=0
+      # searchRoots: []   # optional extra roots
+      # cacheDir: build/.antora
+      # dBinary: antora-source-resolver   # optional D accelerator
+----
+
+== Artifacts (gitignored)
+
+* `build/.antora/local-content-cache.json` — cached clone paths
+* `build/.antora/antora-playbook-local.generated.yml` — snapshot after resolution (for debugging)
+
+== Optional D accelerator
+
+https://github.com/antora-supplemental/antora-source-resolver[`antora-source-resolver`] — same contract, faster directory walks on large hives. Build with `dub build`; put the binary on `PATH` or set `dBinary` on the extension.
+
+== Modes
+
+* `auto` — enable locally; disabled when `CI` or `GITHUB_ACTIONS` is set
+* `on` / `off` — force
+* Env: `ANTORA_LOCAL_SOURCES=1|0` overrides `auto`
+
+If no local clone is found, the remote URL is kept and a warning is logged.

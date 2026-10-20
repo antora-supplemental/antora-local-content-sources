@@ -1,0 +1,34 @@
+{
+  "name": "@antora-supplemental/antora-local-content-sources",
+  "version": "0.1.0",
+  "description": "Antora extension: resolve remote content sources to local clones via stable marker files, with cached search and optional D CLI accelerator.",
+  "main": "lib/index.js",
+  "license": "MIT",
+  "keywords": [
+    "antora",
+    "antora-extension",
+    "local",
+    "content-sources",
+    "playbook"
+  ],
+  "homepage": "https://github.com/antora-supplemental/antora-local-content-sources",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antora-supplemental/antora-local-content-sources.git"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "files": [
+    "lib/**/*",
+    "README.adoc",
+    "CHANGELOG.adoc",
+    "LICENSE"
+  ]
+}

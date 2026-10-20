@@ -1,5 +1,11 @@
 = Changelog
 
+== [0.2.4] - 2026-10-20
+
+=== Changed
+
+* Visible progress before slow work: stderr + logger banners explaining disk search (why/what/how), cache-only fast path, D binary download, and elapsed time when search completes.
+
 == [0.2.3] - 2026-10-20
 
 === Added

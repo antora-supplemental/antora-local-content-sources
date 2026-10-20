@@ -153,7 +153,7 @@ try {
         $confirmPanel.Visible = $false
         $buttonPanel.Visible = $false
         $progressPanel.Visible = $true
-        $form.Text = 'Local content search'
+        $form.Text = 'Antora Local content search'
         $form.AcceptButton = $null
         $form.CancelButton = $null
         $form.TopMost = $false
@@ -240,7 +240,7 @@ try {
         $confirmPanel.Visible = $false
         $buttonPanel.Visible = $false
         $progressPanel.Visible = $true
-        $form.Text = 'Local content search'
+        $form.Text = 'Antora Local content search'
         $form.AcceptButton = $null
         $form.CancelButton = $null
         $form.TopMost = $false

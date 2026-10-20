@@ -1,5 +1,11 @@
 = Changelog
 
+== [0.2.9] - 2026-10-20
+
+=== Changed
+
+* The Windows search window title is "Antora Local content search" on the Yes/No confirm view and on the later progress view.
+
 == [0.2.8] - 2026-10-20
 
 === Changed

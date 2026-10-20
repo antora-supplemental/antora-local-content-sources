@@ -1,5 +1,11 @@
 = Changelog
 
+== [0.2.5] - 2026-10-20
+
+=== Fixed
+
+* Syntax error in disk-search confirmation branch (`Unexpected token ')'`) prevented pack load via facto-stack.
+
 == [0.2.4] - 2026-10-20
 
 === Changed

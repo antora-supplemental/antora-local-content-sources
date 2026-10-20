@@ -1,5 +1,12 @@
 = Changelog
 
+== [0.2.3] - 2026-10-20
+
+=== Added
+
+* Interactive confirmation before disk search when cache paths are missing/invalid (TTY). Env `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes|no` bypasses the prompt for scripts; bypass text is included in the question for agent/LLM use.
+* Skip D/MFT when all remotes still validate from cache.
+
 == [0.2.2] - 2026-10-20
 
 === Changed

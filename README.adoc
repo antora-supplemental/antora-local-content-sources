@@ -44,7 +44,20 @@ antora:
   extensions:
     - require: '@antora-supplemental/antora-local-content-sources'
       mode: auto
+      # confirmSearch: auto   # prompt on TTY when cache miss (default)
+      # confirmSearch: never-prompt   # always search without asking
 ----
+
+== Disk search confirmation
+
+When cached clone paths are missing or invalid, the extension may scan drives (slow on Windows MFT). On an **interactive terminal** it asks before searching.
+
+Scripting bypass (also printed in the prompt for agents):
+
+* `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes` — search without prompting
+* `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=no` — skip search; use remotes for uncached sources (still applies valid cache entries)
+
+Non-TTY runs default to **yes** (search) unless the env var is set.
 
 Discovery finds every `.antora-source-id` candidate (MFT on Windows, walks elsewhere), then **reads the file** and matches `id` / `url`.
 

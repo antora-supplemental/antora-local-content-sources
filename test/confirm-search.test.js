@@ -7,7 +7,13 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 
 const { formatMarkerFile, markerIdForRemote, MARKER_BASENAME } = require('../lib/marker-id')
-const { parseConfirmToken, diskSearchNeeded, confirmSearchPreflight } = require('../lib/confirm-search')
+const { parseConfirmToken, diskSearchNeeded, confirmSearchPreflight, formatConfirmQuestion } = require('../lib/confirm-search')
+
+test('confirm prompt keeps a space in remote source(s)', () => {
+  const question = formatConfirmQuestion(5, 5)
+  assert.match(question, /5 of 5 remote source\(s\)/)
+  assert.doesNotMatch(question, /remotesource/)
+})
 
 test('parseConfirmToken accepts scripting bypass values', () => {
   assert.equal(parseConfirmToken('yes'), 'yes')

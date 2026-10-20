@@ -1,5 +1,12 @@
 = Changelog
 
+== [0.2.6] - 2026-10-20
+
+=== Fixed
+
+* Disk-search banner is printed once, on stderr, with an ASCII frame (`-`, `|`). The Antora logger gets a one-line ASCII summary only, so Windows consoles no longer show a mojibake duplicate of the box drawing.
+* Confirmation prompt and banner say "remote source(s)" (space between the words).
+
 == [0.2.5] - 2026-10-20
 
 === Fixed

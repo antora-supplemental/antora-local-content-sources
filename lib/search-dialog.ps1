@@ -1,4 +1,5 @@
-# Windows desktop confirm + progress for antora-local-content-sources.
+# Windows desktop path choice and search progress for antora-local-content-sources.
+# Row actions: Download, Move, Local.
 # Launched hidden (wscript window style 0). No console. ASCII only.
 param(
     [Parameter(Mandatory = $true)][string] $Request,
@@ -67,53 +68,109 @@ try {
     Add-WrapLabel ([string]$req.bypass) (New-Object System.Drawing.Font('Segoe UI', 9)) $muted | Out-Null
     $header.Height = $script:y + 4
 
-    $list = New-Object System.Windows.Forms.ListView
-    $list.Name = 'sources'
-    $list.View = [System.Windows.Forms.View]::Details
-    $list.FullRowSelect = $true
-    $list.GridLines = $true
-    $list.HideSelection = $false
-    $list.MultiSelect = $false
-    $list.Dock = 'Fill'
-    $list.Font = New-Object System.Drawing.Font('Segoe UI', 9)
-    $list.HeaderStyle = 'Nonclickable'
-    [void]$list.Columns.Add('Remote URL', 640)
-    [void]$list.Columns.Add('Status', 160)
+    $grid = New-Object System.Windows.Forms.DataGridView
+    $grid.Name = 'sources'
+    $grid.Dock = 'Fill'
+    $grid.AllowUserToAddRows = $false
+    $grid.AllowUserToDeleteRows = $false
+    $grid.RowHeadersVisible = $false
+    $grid.SelectionMode = 'FullRowSelect'
+    $grid.MultiSelect = $false
+    $grid.AutoGenerateColumns = $false
+    $grid.BackgroundColor = [System.Drawing.Color]::White
+    $grid.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+    $colUrl = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+    $colUrl.Name = 'url'
+    $colUrl.HeaderText = 'Remote URL'
+    $colUrl.ReadOnly = $true
+    $colUrl.AutoSizeMode = 'Fill'
+    $colStatus = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+    $colStatus.Name = 'status'
+    $colStatus.HeaderText = 'Status'
+    $colStatus.ReadOnly = $true
+    $colStatus.Width = 140
+    $colAction = New-Object System.Windows.Forms.DataGridViewButtonColumn
+    $colAction.Name = 'action'
+    $colAction.HeaderText = 'Action'
+    $colAction.Width = 120
+    $colAction.UseColumnTextForButtonValue = $false
+    [void]$grid.Columns.Add($colUrl)
+    [void]$grid.Columns.Add($colStatus)
+    [void]$grid.Columns.Add($colAction)
 
     if ($null -ne $req.sources) {
         foreach ($src in @($req.sources)) {
-            $item = New-Object System.Windows.Forms.ListViewItem([string]$src.url)
-            $item.Tag = [string]$src.key
             $initial = [string]$src.status
             if (-not $initial) { $initial = 'waiting' }
-            [void]$item.SubItems.Add($initial)
-            [void]$list.Items.Add($item)
+            $label = [string]$src.button
+            if (-not $label) { $label = 'Download' }
+            $index = $grid.Rows.Add([string]$src.url, $initial, $label)
+            $grid.Rows[$index].Tag = [string]$src.key
+            if ($label -eq 'Local') {
+                $grid.Rows[$index].Cells[2].ReadOnly = $true
+            }
         }
     }
 
-    function Resize-SourceColumns {
-        if ($list.Columns.Count -lt 2) { return }
-        $statusWidth = 160
-        $urlWidth = $list.ClientSize.Width - $statusWidth - 8
-        if ($urlWidth -lt 280) { $urlWidth = 280 }
-        $list.Columns[0].Width = $urlWidth
-        $list.Columns[1].Width = $statusWidth
-    }
-    $list.Add_Resize({ Resize-SourceColumns })
-
-    function Set-SourceStatus ([string] $Url, [string] $Status) {
-        foreach ($item in $list.Items) {
-            $display = [string]$item.Text
-            $key = [string]$item.Tag
+    function Set-SourceStatus ([string] $Url, [string] $Status, [string] $Button) {
+        foreach ($row in $grid.Rows) {
+            $display = [string]$row.Cells[0].Value
+            $key = [string]$row.Tag
             if ($display -eq $Url -or ($key -and $key -eq $Url)) {
-                if ($item.SubItems.Count -lt 2) {
-                    [void]$item.SubItems.Add($Status)
-                } else {
-                    $item.SubItems[1].Text = $Status
+                $row.Cells[1].Value = $Status
+                if ($Button) {
+                    $row.Cells[2].Value = $Button
+                    $row.Cells[2].ReadOnly = ($Button -eq 'Local')
                 }
             }
         }
     }
+
+    function Invoke-Acquire ([string] $Url) {
+        if (-not $req.nodePath -or -not $req.acquireScript) { return }
+        $reqPath = [string]$req.acquireLog + '.' + [guid]::NewGuid().ToString('n') + '.json'
+        $body = '{"url":"' + ($Url.Replace('\', '\\').Replace('"', '\"')) + '","playbookDir":"' + ([string]$req.playbookDir).Replace('\', '\\').Replace('"', '\"') + '","antoraContentCache":"' + ([string]$req.antoraContentCache).Replace('\', '\\').Replace('"', '\"') + '","log":"' + ([string]$req.acquireLog).Replace('\', '\\').Replace('"', '\"') + '"}'
+        Write-TextFile $reqPath $body
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = [string]$req.nodePath
+        $psi.Arguments = '"' + [string]$req.acquireScript + '" "' + $reqPath + '"'
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $out = $proc.StandardOutput.ReadToEnd()
+        $errText = $proc.StandardError.ReadToEnd()
+        $proc.WaitForExit()
+        if (-not $out) {
+            Set-SourceStatus $Url 'error' 'Download'
+            Add-LogLine ('acquire failed ' + $errText) $null
+            return
+        }
+        try { $result = $out | ConvertFrom-Json } catch {
+            Set-SourceStatus $Url 'error' 'Download'
+            Add-LogLine 'acquire failed' $null
+            return
+        }
+        if ($result.ok) {
+            Set-SourceStatus $Url 'validated' 'Local'
+            Add-LogLine ('local checkout ' + [string]$result.path) $null
+        } else {
+            Set-SourceStatus $Url 'error' 'Download'
+            Add-LogLine ([string]$result.error) $null
+        }
+    }
+
+    $grid.Add_CellContentClick({
+        $event = $args[1]
+        if ($null -eq $event -or $event.ColumnIndex -ne 2) { return }
+        $row = $grid.Rows[$event.RowIndex]
+        $label = [string]$row.Cells[2].Value
+        if ($label -eq 'Local') { return }
+        $url = [string]$row.Cells[0].Value
+        $row.Cells[1].Value = 'working'
+        Invoke-Acquire $url
+    })
 
     $workLabel = New-Object System.Windows.Forms.Label
     $workLabel.Text = ''
@@ -148,34 +205,12 @@ try {
         $logBox.ScrollToCaret()
     }
 
-    $buttonPanel = New-Object System.Windows.Forms.Panel
-    $buttonPanel.Dock = 'Bottom'
-    $buttonPanel.Height = 56
-
-    $yesBtn = New-Object System.Windows.Forms.Button
-    $yesBtn.Text = 'Yes'
-    $yesBtn.Size = New-Object System.Drawing.Size(96, 32)
-    $noBtn = New-Object System.Windows.Forms.Button
-    $noBtn.Text = 'No'
-    $noBtn.Size = New-Object System.Drawing.Size(96, 32)
-    $buttonPanel.Controls.Add($yesBtn)
-    $buttonPanel.Controls.Add($noBtn)
-    $buttonPanel.Add_Resize({
-        $noBtn.Left = $buttonPanel.ClientSize.Width - $noBtn.Width - 16
-        $yesBtn.Left = $noBtn.Left - $yesBtn.Width - 12
-        $yesBtn.Top = 12
-        $noBtn.Top = 12
-    })
-
-    # Last added docks first: buttons, then log, then the working label, then the header.
-    $form.Controls.Add($list)
+    # Last added docks first: log, then the working label, then the header.
+    $form.Controls.Add($grid)
     $form.Controls.Add($header)
     $form.Controls.Add($workLabel)
     $form.Controls.Add($logBox)
-    $form.Controls.Add($buttonPanel)
 
-    $form.AcceptButton = $yesBtn
-    $form.CancelButton = $noBtn
     $form.TopMost = $true
 
     function Write-Decision ([string] $Value) {
@@ -187,36 +222,8 @@ try {
         Remove-Item -LiteralPath $tmp -ErrorAction SilentlyContinue
     }
 
-    function Show-ProgressView {
-        if ($script:progressing) { return }
-        $script:progressing = $true
-        $buttonPanel.Visible = $false
-        $buttonPanel.Height = 0
-        $form.Text = 'Antora Local content search'
-        $form.AcceptButton = $null
-        $form.CancelButton = $null
-        $form.TopMost = $false
-        $script:started = Get-Date
-        $script:timer.Start()
-        Resize-SourceColumns
-    }
-
-    $yesBtn.Add_Click({
-        Show-ProgressView
-        Write-Decision 'yes'
-    })
-    $noBtn.Add_Click({
-        Write-Decision 'no'
-        $form.Close()
-    })
-    $form.Add_FormClosing({
-        if (-not $script:decided -and $Mode -eq 'confirm') {
-            Write-Decision 'no'
-        }
-    })
     $form.Add_Shown({
         $form.Activate()
-        Resize-SourceColumns
     })
 
     function Read-SharedText ([string] $Path) {
@@ -276,7 +283,7 @@ try {
             $stamp = Get-Date -Format 'HH:mm:ss'
             $kind = [string]$ev.type
             if ($kind -eq 'source') {
-                Set-SourceStatus ([string]$ev.url) ([string]$ev.status)
+                Set-SourceStatus ([string]$ev.url) ([string]$ev.status) ([string]$ev.button)
                 Add-LogLine ('{0}  {1}  {2}  {3}' -f $stamp, $kind, [string]$ev.url, [string]$ev.status) $null
                 continue
             }
@@ -297,10 +304,54 @@ try {
         }
     })
 
-    if ($Mode -eq 'progress') {
-        Show-ProgressView
+    if ($Mode -eq 'choose') {
+        $pick = New-Object System.Windows.Forms.Form
+        $pick.Text = 'Antora Local content search'
+        $pick.StartPosition = 'CenterScreen'
+        $pick.Size = New-Object System.Drawing.Size(680, 320)
+        $pick.Font = New-Object System.Drawing.Font('Segoe UI', 10)
+        $pick.BackColor = [System.Drawing.Color]::White
+        $prompt = New-Object System.Windows.Forms.Label
+        $prompt.Text = 'Where should this build read the docs?'
+        $prompt.AutoSize = $true
+        $prompt.Location = New-Object System.Drawing.Point(24, 24)
+        $prompt.Font = New-Object System.Drawing.Font('Segoe UI', 14, [System.Drawing.FontStyle]::Bold)
+        $pick.Controls.Add($prompt)
+        $note = New-Object System.Windows.Forms.Label
+        $note.Text = [string]$req.bypass
+        $note.MaximumSize = New-Object System.Drawing.Size(620, 0)
+        $note.AutoSize = $true
+        $note.Location = New-Object System.Drawing.Point(24, 72)
+        $pick.Controls.Add($note)
+        $localBtn = New-Object System.Windows.Forms.Button
+        $localBtn.Text = 'Use local docs'
+        $localBtn.Size = New-Object System.Drawing.Size(170, 36)
+        $localBtn.Location = New-Object System.Drawing.Point(24, 220)
+        $remoteBtn = New-Object System.Windows.Forms.Button
+        $remoteBtn.Text = 'Use remote docs'
+        $remoteBtn.Size = New-Object System.Drawing.Size(170, 36)
+        $remoteBtn.Location = New-Object System.Drawing.Point(210, 220)
+        $pick.Controls.Add($localBtn)
+        $pick.Controls.Add($remoteBtn)
+        $localBtn.Add_Click({
+            Write-Decision 'local'
+            $pick.Close()
+        })
+        $remoteBtn.Add_Click({
+            Write-Decision 'remote'
+            $pick.Close()
+        })
+        $pick.Add_FormClosing({
+            if (-not $script:decided) { Write-Decision 'remote' }
+        })
+        Write-TextFile $Ready 'ready'
+        [System.Windows.Forms.Application]::Run($pick)
+        exit 0
     }
 
+    $script:started = Get-Date
+    $script:timer.Start()
+    $form.Text = 'Antora Local content search'
     Write-TextFile $Ready 'ready'
     [System.Windows.Forms.Application]::Run($form)
 } catch {

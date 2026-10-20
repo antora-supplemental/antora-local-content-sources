@@ -1,5 +1,12 @@
 = Changelog
 
+== [0.2.12] - 2026-10-20
+
+=== Changed
+
+* A desktop build asks `Use local docs` or `Use remote docs` before any search, and remembers the choice in the local-content cache. `Use remote docs` leaves playbook URLs remote. `Use local docs` opens the search window with no second Yes/No prompt.
+* Each source row has a Download, Move, or Local button. Move and Download put the repo at `<hive>/github.com/<org>/<repo>` (creating the org folder) and write `.antora-source-id`. A non-empty wrong folder is left alone and the row shows an error. `ANTORA_LOCAL_SOURCES_MODE=ask|local|remote` changes the remembered choice. CI still never scans.
+
 == [0.2.11] - 2026-10-20
 
 === Changed

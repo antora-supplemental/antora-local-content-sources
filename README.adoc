@@ -56,12 +56,13 @@ antora:
 
 When cached clone paths are missing or invalid, the extension may scan drives (slow on Windows MFT).
 
-On a **Windows desktop session** it opens a window titled "Antora Local content search" with the question "Search for local Antora docs?", the playbook source list, and Yes / No. After Yes, that same window keeps the list and a scrollable activity log. The ASCII banner and Y/n prompt are not printed. Closing the progress window does not stop the build.
+On a **Windows desktop session** the first window asks `Use local docs` or `Use remote docs` and remembers the choice in the local-content cache. `Use remote docs` leaves playbook URLs remote and does not scan. `Use local docs` opens the search window (no second Yes/No): heading "Search for local Antora docs?", the source list, and a per-row Download, Move, or Local button. Move and Download place the repo at `<hive>\github.com\<org>\<repo>` and write `.antora-source-id`. The ASCII banner is not printed. Closing the progress window does not stop the build.
 
 Shell output is used only when there is no desktop UI, or when you force it:
 
 * `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=yes` -- outside CI, search without prompting (agent bypass; phase lines on the terminal, ASCII, once). In CI this does not start a disk scan.
 * `ANTORA_LOCAL_SOURCES_CONFIRM_SEARCH=no` -- skip search; use remotes for uncached sources (still applies valid cache entries)
+* `ANTORA_LOCAL_SOURCES_MODE=ask|local|remote` -- override the remembered path choice. `ask` shows Use local docs / Use remote docs again. `local` searches without that question. `remote` leaves playbook URLs remote and does not scan.
 * `ANTORA_LOCAL_SOURCES_UI=tty` -- force the terminal banner and Y/n prompt (`shell` and `ascii` are aliases). CI still does not scan.
 
 If the window cannot be created, the extension says so once and falls back to the terminal banner.

@@ -1,11 +1,25 @@
 = Changelog
 
+== [0.2.0] - 2026-10-20
+
+=== Added
+
+* Search order: playbook directory first, then ancestors (excluding already-searched child subtrees, capped by `maxUpwardHops`), then `searchRoots`, then other drives in parallel (Node worker threads; D `std.parallelism`).
+* Duplicate clone detection: logs every match; build continues with the first ordered hit unless overridden.
+* Gitignored overrides file `.antora-local-sources.yml` (see `.antora-local-sources.example.yml`) — pin by HTTPS URL or `.antora-src-*` marker basename.
+* Auto-download `antora-source-resolver` from GitHub Releases into `build/.antora/bin/` (`dAutoDownload`, `dRelease`, `dRepo` config).
+* Env `ANTORA_LOCAL_SOURCES_SEARCH_DRIVES=0` disables cross-drive search (tests / fast iteration).
+
+=== Changed
+
+* Default `searchRoots` no longer includes playbook parent; upward search covers that path.
+
 == [0.1.0] - 2026-10-19
 
 === Added
 
 * Antora extension: resolve remote `content.sources` to local clones using stable `.antora-src-*` marker files (deterministic SHA-256 basename per normalized git URL).
-* Search roots: playbook dir, parent, `%code%` / `CODE_ROOT`, `~/code`, optional `searchRoots`; hive heuristic `github.com/{owner}/{repo}` when markers are missing.
+* Search roots: playbook dir, `%code%` / `CODE_ROOT`, `~/code`, optional `searchRoots`; hive heuristic `github.com/{owner}/{repo}` when markers are missing.
 * Cache under `build/.antora/local-content-cache.json`; writes `build/.antora/antora-playbook-local.generated.yml` for debugging.
 * Optional `antora-source-resolver` D CLI integration (`dBinary` config).
 * Legacy `.antora-source-id` (URL in file body) supported.

@@ -8,7 +8,7 @@ Committed `antora-playbook-local.yml` files assume a fixed sibling folder layout
 
 == Marker files (per content repo)
 
-Each git remote gets a stable marker **basename** derived from the normalized URL (SHA-256, same algorithm in Node and the optional D CLI):
+Each git remote gets a stable marker **basename** derived from the normalized URL (SHA-256, same algorithm in Node and the D CLI):
 
 [source]
 ----
@@ -32,19 +32,45 @@ antora:
   extensions:
     - require: '@antora-supplemental/antora-local-content-sources'
       mode: auto   # off in CI; on locally unless ANTORA_LOCAL_SOURCES=0
-      # searchRoots: []   # optional extra roots
+      # searchRoots: []        # extra roots (e.g. %code%)
+      # maxUpwardHops: 16       # limit ancestor walk from playbook dir
+      # maxDepth: 10            # depth under each search anchor
+      # searchOtherDrives: true # other drive letters / mount points (parallel)
+      # dAutoDownload: true     # fetch D CLI from GitHub Releases when missing
+      # dRelease: v0.1.0
       # cacheDir: build/.antora
-      # dBinary: antora-source-resolver   # optional D accelerator
 ----
+
+== Duplicate clones
+
+When more than one checkout contains the same marker, the build **lists every path** (Antora log + D CLI stderr) and uses the first hit in search order. Pin the checkout you want in a **gitignored** file at the playbook root:
+
+[source,yaml]
+----
+# .antora-local-sources.yml (copy from .antora-local-sources.example.yml)
+sources:
+  https://github.com/dev-centr/docs:
+    path: C:/code/github.com/dev-centr/docs
+  .antora-src-e3cf0439ac8b22aea9c985f358734acf:
+    path: C:/code/github.com/dev-centr/docs
+----
+
+== Search order
+
+. Playbook directory (depth `maxDepth`)
+. Each parent directory up to `maxUpwardHops`, searching the parent tree but **not** re-entering the child directory already scanned
+. Extra `searchRoots` (for example `%code%`)
+. Other drives / mount points (parallel; skip with `ANTORA_LOCAL_SOURCES_SEARCH_DRIVES=0`)
 
 == Artifacts (gitignored)
 
 * `build/.antora/local-content-cache.json` — cached clone paths
 * `build/.antora/antora-playbook-local.generated.yml` — snapshot after resolution (for debugging)
+* `build/.antora/bin/` — downloaded `antora-source-resolver` binary when auto-download is enabled
 
-== Optional D accelerator
+== D accelerator
 
-https://github.com/antora-supplemental/antora-source-resolver[`antora-source-resolver`] — same contract, faster directory walks on large hives. Build with `dub build`; put the binary on `PATH` or set `dBinary` on the extension.
+https://github.com/antora-supplemental/antora-source-resolver[`antora-source-resolver`] — same contract, faster walks. Released on GitHub (`v0.1.0+`); the extension downloads the matching asset for your OS/arch into `build/.antora/bin/` when `dAutoDownload` is true. Override with `dBinary` or a local `dub build`.
 
 == Modes
 

@@ -1,6 +1,6 @@
 {
   "name": "@antora-supplemental/antora-local-content-sources",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Antora extension: resolve remote content sources to local clones via stable marker files, with cached search and optional D CLI accelerator.",
   "main": "lib/index.js",
   "license": "MIT",
@@ -27,6 +27,7 @@
   },
   "files": [
     "lib/**/*",
+    ".antora-local-sources.example.yml",
     "README.adoc",
     "CHANGELOG.adoc",
     "LICENSE"
